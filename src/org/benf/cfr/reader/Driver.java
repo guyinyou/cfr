@@ -31,10 +31,7 @@ import org.benf.cfr.reader.util.output.ProgressDumper;
 import org.benf.cfr.reader.util.output.SummaryDumper;
 import org.benf.cfr.reader.util.output.ToStringDumper;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 class Driver {
 
@@ -128,9 +125,9 @@ class Driver {
             Set<JavaTypeInstance> versionCollisions = getVersionCollisions(clstypes);
             dcCommonState.setCollisions(versionCollisions);
             List<Integer> versionsSeen = ListFactory.newList();
-            
+
             addMissingOuters(clstypes);
-            
+
             for (Map.Entry<Integer, List<JavaTypeInstance>> entry : clstypes.entrySet()) {
                 int forVersion = entry.getKey();
                 versionsSeen.add(forVersion);
@@ -235,7 +232,45 @@ class Driver {
          * If we're working on a case insensitive file system (OH COME ON!) then make sure that
          * we don't have any collisions.
          */
+        int gcCnt = 0;
+        int progressCnt = 0;
+        double progressRate = 0;
+        Iterator<JavaTypeInstance> it = types.iterator();
+        while(it.hasNext()){
+            if(progressCnt++ % 100 == 0){
+                progressRate = (double)progressCnt/(double)types.size()*100d;
+                System.out.printf("filter: %.2f%%\n", progressRate);
+            }
+
+            if(++gcCnt % 500 == 0){
+                gcCnt = 0;
+                dcCommonState = new DCCommonState(options, CfrDriverImpl.classFileSource_global);
+                System.out.println("gc(); gcCnt: " + gcCnt);
+            }
+            JavaTypeInstance type = it.next();
+            String name = type.getRawName();
+            if(!name.startsWith("com.tencent.mm")){
+                it.remove();
+                continue;
+            }
+//            ClassFile c = dcCommonState.getClassFile(type);
+//            if (c.isInnerClass()) {
+//                it.remove();
+//                continue;
+//            }
+        }
+        progressCnt = 0;
         for (JavaTypeInstance type : types) {
+            if(progressCnt++ % 100 == 0){
+                progressRate = (double)progressCnt/(double)types.size()*100d;
+                System.out.printf("handle: %.2f%%\n", progressRate);
+            }
+            if(++gcCnt % 500 == 0){
+                gcCnt = 0;
+                dcCommonState = new DCCommonState(options, CfrDriverImpl.classFileSource_global);
+                System.out.println("gc(); gcCnt: " + gcCnt);
+            }
+
             Dumper d = new ToStringDumper();  // Sentinel dumper.
             try {
                 ClassFile c = dcCommonState.getClassFile(type);
@@ -254,7 +289,12 @@ class Driver {
                 }
 
                 TypeUsageCollectingDumper collectingDumper = new TypeUsageCollectingDumper(options, c);
+                long startTime = System.currentTimeMillis();
                 c.analyseTop(dcCommonState, collectingDumper);
+                long duration = System.currentTimeMillis() - startTime;
+                if (duration > 5000){
+                    System.out.println(duration);
+                }
 
                 JavaTypeInstance classType = c.getClassType();
                 classType = dcCommonState.getObfuscationMapping().get(classType);

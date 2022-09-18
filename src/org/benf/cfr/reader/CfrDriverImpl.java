@@ -43,7 +43,7 @@ public class CfrDriverImpl implements CfrDriver {
         this.options = options;
         this.classFileSource = tmpSource;
     }
-
+    static ClassFileSource2 classFileSource_global = null;
     @Override
     public void analyse(List<String> toAnalyse) {
         /*
@@ -63,6 +63,7 @@ public class CfrDriverImpl implements CfrDriver {
             classFileSource.informAnalysisRelativePathDetail(null, null);
             // Note - both of these need to be reset, as they have caches.
             DCCommonState dcCommonState = new DCCommonState(options, classFileSource);
+            classFileSource_global = classFileSource;
             DumperFactory dumperFactory = outputSinkFactory != null ?
                     new SinkDumperFactory(outputSinkFactory, options) :
                     new InternalDumperFactoryImpl(options);
